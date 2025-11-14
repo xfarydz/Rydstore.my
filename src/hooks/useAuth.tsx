@@ -2,32 +2,6 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-// Cookie helper functions
-const setCookie = (name: string, value: string, days: number) => {
-  if (typeof document === 'undefined') return;
-  const expires = new Date(Date.now() + days * 864e5).toUTCString();
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
-};
-
-const getCookie = (name: string): string | null => {
-  if (typeof document === 'undefined') return null;
-  return document.cookie.split('; ').reduce((result: string | null, cookie: string) => {
-    const parts = cookie.split('=');
-    return parts[0] === name ? decodeURIComponent(parts[1]) : result;
-  }, null as string | null);
-};
-
-const clearSession = () => {
-  if (typeof document === 'undefined') return;
-  // Clear cookies
-  document.cookie = 'sessionId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/';
-  // Clear localStorage
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('shoppingCart');
-  }
-};
-
 interface User {
   id: string;
   name: string;
@@ -47,13 +21,12 @@ interface User {
 interface Notification {
   id: string;
   userId: string;
-  type: 'offer_accepted' | 'offer_rejected' | 'offer_expired' | 'payment_required' | 'payment_success';
+  type: 'offer_accepted' | 'offer_rejected' | 'payment_required' | 'payment_success';
   title: string;
   message: string;
   productId: string;
   productName: string;
   offerId?: string;
-  offeredPrice?: number;
   isRead: boolean;
   createdAt: string;
 }
@@ -91,15 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('useAuth: Initializing...');
     
     if (typeof window !== 'undefined') {
-      // Set up session management with cookies
-      const sessionId = getCookie('sessionId');
       const savedUser = localStorage.getItem('currentUser');
+      console.log('useAuth: Saved user from localStorage:', savedUser);
       
-      // Check if session is valid
-      if (sessionId && savedUser) {
+      if (savedUser) {
         try {
           const parsedUser = JSON.parse(savedUser);
-          console.log('useAuth: Session valid, restoring user:', parsedUser);
+          console.log('useAuth: Parsed user:', parsedUser);
           
           // Ensure user has all required fields for backward compatibility
           const completeUser = {
@@ -114,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           };
           
+          console.log('useAuth: Complete user:', completeUser);
           setUser(completeUser);
           setIsAuthenticated(true);
           // Update localStorage with complete user data
@@ -121,63 +93,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log('useAuth: User authenticated successfully');
         } catch (error) {
           console.error('useAuth: Error parsing saved user:', error);
-          // Clear invalid session
-          clearSession();
+          localStorage.removeItem('currentUser');
         }
       } else {
-        console.log('useAuth: No valid session found');
-        // Clear any lingering data if session invalid
-        if (savedUser && !sessionId) {
-          clearSession();
-        }
+        console.log('useAuth: No saved user found');
       }
-      
-      // Set up session management untuk detect actual browser close
-      const handleVisibilityChange = () => {
-        if (document.hidden) {
-          // Browser tab hidden - might be closing or switching tab
-          // Don't clear session immediately
-        }
-      };
-      
-      const handlePageHide = () => {
-        // Only clear session if page is actually being unloaded permanently
-        // This is more reliable than beforeunload
-        setTimeout(() => {
-          if (document.hidden) {
-            clearSession();
-          }
-        }, 1000); // Small delay to distinguish navigation from close
-      };
-      
-      // Listen for notification updates
-      const handleNotificationUpdate = () => {
-        console.log('Notification update event received');
-        // Access user from current state rather than closure
-        const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
-        if (currentUser) {
-          refreshNotifications();
-        }
-      };
-      
-      window.addEventListener('visibilitychange', handleVisibilityChange);
-      window.addEventListener('pagehide', handlePageHide);
+    }
+    
+    // Listen for notification updates
+    const handleNotificationUpdate = () => {
+      console.log('Notification update event received');
+      if (user) {
+        refreshNotifications();
+      }
+    };
+    
+    if (typeof window !== 'undefined') {
       window.addEventListener('notificationUpdated', handleNotificationUpdate);
-      
-      // Cleanup function
-      const cleanup = () => {
-        window.removeEventListener('visibilitychange', handleVisibilityChange);
-        window.removeEventListener('pagehide', handlePageHide);
-        window.removeEventListener('notificationUpdated', handleNotificationUpdate);
-      };
-      
-      setIsInitialized(true);
-      
-      return cleanup;
     }
     
     setIsInitialized(true);
-  }, []);
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('notificationUpdated', handleNotificationUpdate);
+      }
+    };
+  }, [user]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     // Get users from localStorage
@@ -200,22 +142,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         joinedDate: foundUser.joinedDate
       };
-      
-      // Create session with cookies
-      const sessionId = 'session_' + Date.now();
-      setCookie('sessionId', sessionId, 7); // 7 days
-      
       setUser(userSession);
       setIsAuthenticated(true);
       localStorage.setItem('currentUser', JSON.stringify(userSession));
-      
-      // Show login success message
-      setTimeout(() => {
-        if (typeof window !== 'undefined' && window.showAlert) {
-          window.showAlert('success', 'Welcome Back!', `Successfully logged in as ${userSession.name}`);
-        }
-      }, 500);
-      
       return true;
     }
     return false;
@@ -251,7 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     users.push(newUser);
     localStorage.setItem('registeredUsers', JSON.stringify(users));
     
-    // Auto-login after registration with session
+    // Auto-login after registration
     const userSession = {
       id: newUser.id,
       name: newUser.name,
@@ -261,21 +190,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       address: newUser.address,
       joinedDate: newUser.joinedDate
     };
-    
-    // Create session with cookies
-    const sessionId = 'session_' + Date.now();
-    setCookie('sessionId', sessionId, 7); // 7 days
-    
     setUser(userSession);
     setIsAuthenticated(true);
     localStorage.setItem('currentUser', JSON.stringify(userSession));
-    
-    // Show registration success and profile completion reminder
-    setTimeout(() => {
-      if (typeof window !== 'undefined' && window.showAlert) {
-        window.showAlert('success', 'Account Created Successfully!', `Welcome ${userSession.name}! Please complete your profile for better shopping experience.`);
-      }
-    }, 500);
     
     return true;
   };
@@ -291,23 +208,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(`cart_${user.id}`);
     }
     
-    // Clear session
-    clearSession();
-    
     setUser(null);
     setIsAuthenticated(false);
     setNotifications([]);
     setUnreadCount(0);
+    localStorage.removeItem('currentUser');
     
     // Clear global favorites (legacy - for users without login)
     localStorage.removeItem('favorites');
     // Clear global cart
     localStorage.removeItem('cartItems');
-    
-    // Show logout message
-    if (typeof window !== 'undefined' && window.showAlert) {
-      window.showAlert('info', 'Logged Out', 'You have been successfully logged out.');
-    }
   };
 
   const refreshNotifications = () => {
