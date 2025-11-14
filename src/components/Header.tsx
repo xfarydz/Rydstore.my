@@ -7,7 +7,6 @@ import Link from 'next/link'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 import { useAuth } from '@/hooks/useAuth'
 import { products } from '@/data/products'
-import { isProfileCompleteForCheckout } from '@/utils/profileValidation'
 import Chat from './Chat'
 import NotificationDropdown from './NotificationDropdown'
 import UserOffers from './UserOffers'
@@ -123,49 +122,8 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [showSearchResults, setShowSearchResults] = useState(false)
-  const [cartCount, setCartCount] = useState(0)
-  const [favoriteCount, setFavoriteCount] = useState(0)
   const { settings } = useSiteSettings()
   const { user, isAuthenticated, isInitialized, logout, setShowAuthModal } = useAuth()
-
-  // Check if profile is incomplete
-  const isProfileIncomplete = isAuthenticated && user ? !isProfileCompleteForCheckout(user).isComplete : false;
-
-  // Cart count management
-  useEffect(() => {
-    const updateCartCount = () => {
-      const cart = JSON.parse(localStorage.getItem('shoppingCart') || '[]');
-      const totalItems = cart.reduce((total: number, item: any) => total + item.quantity, 0);
-      setCartCount(totalItems);
-    };
-
-    updateCartCount();
-    window.addEventListener('storage', updateCartCount);
-    window.addEventListener('cartUpdated', updateCartCount);
-    
-    return () => {
-      window.removeEventListener('storage', updateCartCount);
-      window.removeEventListener('cartUpdated', updateCartCount);
-    };
-  }, []);
-
-  // Favorite count management
-  useEffect(() => {
-    const updateFavoriteCount = () => {
-      const favoritesKey = isAuthenticated && user?.id ? `favorites_${user.id}` : 'favorites';
-      const favorites = JSON.parse(localStorage.getItem(favoritesKey) || '[]');
-      setFavoriteCount(favorites.length);
-    };
-
-    updateFavoriteCount();
-    window.addEventListener('storage', updateFavoriteCount);
-    window.addEventListener('favoriteChanged', updateFavoriteCount);
-    
-    return () => {
-      window.removeEventListener('storage', updateFavoriteCount);
-      window.removeEventListener('favoriteChanged', updateFavoriteCount);
-    };
-  }, [isAuthenticated, user]);
 
   // Search functionality
   const handleSearch = (query: string) => {
@@ -227,27 +185,21 @@ export default function Header() {
               <img
                 src={settings.logoUrl}
                 alt={`${settings.storeName} Logo`}
-                className="h-8 sm:h-10 md:h-12 w-auto object-contain"
-                onError={(e) => {
-                  console.error('Logo failed to load:', settings.logoUrl);
-                  // Fallback to text if image fails to load
-                  (e.target as HTMLImageElement).style.display = 'none';
-                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                }}
+                className="h-12 w-auto object-contain"
               />
-            ) : null}
-            {/* Fallback text logo */}
-            <div className={`flex items-center ${settings.logoUrl ? 'hidden' : ''}`}>
-              <span className="text-lg sm:text-xl font-bold text-black font-display">{settings.storeName}</span>
-            </div>
+            ) : (
+              <div className="flex items-center">
+                <span className="text-xl font-bold text-black font-display">{settings.storeName}</span>
+              </div>
+            )}
           </div>
           
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-10">
-            <button onClick={() => window.location.href = '/'} className="text-gray-800 hover:text-black font-semibold transition-colors text-sm tracking-wide">HOME</button>
-            <button onClick={() => window.location.href = '/new-arrivals'} className="text-gray-800 hover:text-black font-semibold transition-colors text-sm tracking-wide">NEW ARRIVALS</button>
-            <button onClick={() => window.location.href = '/shop'} className="text-gray-800 hover:text-black font-semibold transition-colors text-sm tracking-wide">SHOP ALL</button>
-            <button onClick={() => window.location.href = '/sold-items'} className="text-gray-800 hover:text-black font-semibold transition-colors text-sm tracking-wide">SOLD ITEMS</button>
+            <a href="/" className="text-gray-800 hover:text-black font-semibold transition-colors text-sm tracking-wide">HOME</a>
+            <a href="/new-arrivals" className="text-gray-800 hover:text-black font-semibold transition-colors text-sm tracking-wide">NEW ARRIVALS</a>
+            <a href="/shop" className="text-gray-800 hover:text-black font-semibold transition-colors text-sm tracking-wide">SHOP ALL</a>
+            <a href="/sold-items" className="text-gray-800 hover:text-black font-semibold transition-colors text-sm tracking-wide">SOLD ITEMS</a>
           </nav>
           
           {/* Right Side Actions */}
@@ -277,16 +229,10 @@ export default function Header() {
               <div className="relative">
                 <button 
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center space-x-2 p-2 text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all relative"
+                  className="flex items-center space-x-2 p-2 text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all"
                 >
                   <User className="h-5 w-5" />
                   <span className="hidden md:block text-sm font-medium">{user?.name}</span>
-                  {/* Red exclamation mark for incomplete profile */}
-                  {isProfileIncomplete && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold animate-pulse">
-                      !
-                    </span>
-                  )}
                 </button>
                 
                 {showUserMenu && (
@@ -572,82 +518,13 @@ export default function Header() {
         
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <div className="lg:hidden py-4 border-t border-gray-200 bg-white shadow-lg">
-            <div className="flex flex-col space-y-4 px-4">
-              {/* Navigation Links */}
-              <button onClick={() => { window.location.href = '/'; setIsMenuOpen(false); }} className="text-gray-900 font-semibold hover:text-black text-left">HOME</button>
-              <button onClick={() => { window.location.href = '/new-arrivals'; setIsMenuOpen(false); }} className="text-gray-900 font-semibold hover:text-black text-left">NEW ARRIVALS</button>
-              <button onClick={() => { window.location.href = '/shop'; setIsMenuOpen(false); }} className="text-gray-900 font-semibold hover:text-black text-left">SHOP ALL</button>
-              <button onClick={() => { window.location.href = '/sold-items'; setIsMenuOpen(false); }} className="text-gray-900 font-semibold hover:text-black text-left">SOLD ITEMS</button>
-              
-              {/* Divider */}
-              <div className="border-t border-gray-200 my-2"></div>
-              
-              {/* User Actions in Dropdown */}
-              {isInitialized && isAuthenticated && user ? (
-                <>
-                  {/* Profile */}
-                  <a href="/profile" className="flex items-center text-gray-600 hover:text-black font-medium relative">
-                    <User className="h-5 w-5 mr-3" />
-                    Profile
-                    {/* Red exclamation mark for incomplete profile */}
-                    {isProfileIncomplete && (
-                      <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold animate-pulse">
-                        !
-                      </span>
-                    )}
-                  </a>
-                  
-                  {/* Favorites */}
-                  <a href="/favorites" className="flex items-center text-gray-600 hover:text-black font-medium">
-                    <Heart className="h-5 w-5 mr-3" />
-                    Loved Items ({favoriteCount})
-                  </a>
-                  
-                  {/* Chat */}
-                  <button 
-                    onClick={() => {
-                      setShowChat(true);
-                      setIsMenuOpen(false);
-                    }}
-                    className="flex items-center text-gray-600 hover:text-black font-medium text-left"
-                  >
-                    <MessageCircle className="h-5 w-5 mr-3" />
-                    Chat
-                  </button>
-                  
-                  {/* Cart */}
-                  <a href="/cart" className="flex items-center text-gray-600 hover:text-black font-medium">
-                    <ShoppingBag className="h-5 w-5 mr-3" />
-                    Cart ({cartCount})
-                  </a>
-                  
-                  <div className="border-t border-gray-200 my-2"></div>
-                  
-                  {/* Logout */}
-                  <button 
-                    onClick={() => {
-                      logout();
-                      setIsMenuOpen(false);
-                    }}
-                    className="flex items-center text-red-600 hover:text-red-800 font-medium text-left"
-                  >
-                    <LogOut className="h-5 w-5 mr-3" />
-                    Logout
-                  </button>
-                </>
-              ) : (
-                <button 
-                  onClick={() => {
-                    setShowAuthModal(true);
-                    setIsMenuOpen(false);
-                  }}
-                  className="flex items-center text-blue-600 hover:text-blue-800 font-medium text-left"
-                >
-                  <User className="h-5 w-5 mr-3" />
-                  Login / Register
-                </button>
-              )}
+          <div className="lg:hidden py-4 border-t border-gray-200">
+            <div className="flex flex-col space-y-4">
+              <a href="/" className="text-gray-900 font-semibold hover:text-black">HOME</a>
+              <a href="/new-arrivals" className="text-gray-900 font-semibold hover:text-black">NEW ARRIVALS</a>
+              <a href="/shop" className="text-gray-900 font-semibold hover:text-black">SHOP ALL</a>
+              <a href="/sold-items" className="text-gray-900 font-semibold hover:text-black">SOLD ITEMS</a>
+              <a href="/admin" className="text-xs text-gray-400 hover:text-gray-600">•</a>
             </div>
           </div>
         )}
