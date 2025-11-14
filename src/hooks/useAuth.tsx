@@ -27,6 +27,7 @@ interface Notification {
   productId: string;
   productName: string;
   offerId?: string;
+  offeredPrice?: number;
   isRead: boolean;
   createdAt: string;
 }
