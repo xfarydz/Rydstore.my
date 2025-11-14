@@ -51,6 +51,30 @@ export function useSiteSettings() {
     const updatedSettings = { ...settings, ...newSettings };
     setSettings(updatedSettings);
     localStorage.setItem('siteSettings', JSON.stringify(updatedSettings));
+    
+    // Force refresh images if logo changed (for mobile cache busting)
+    if (newSettings.logoUrl && newSettings.logoUrl !== settings.logoUrl) {
+      console.log('🔄 Logo updated, clearing cache for mobile devices...');
+      
+      // Clear mobile browser cache for images
+      if (typeof window !== 'undefined') {
+        // Trigger storage event to update other tabs
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'siteSettings',
+          newValue: JSON.stringify(updatedSettings),
+          url: window.location.href
+        }));
+        
+        // Force reload images by updating timestamp
+        setTimeout(() => {
+          const images = document.querySelectorAll('img[src*="logo"]');
+          images.forEach((img: any) => {
+            const originalSrc = img.src.split('?')[0];
+            img.src = `${originalSrc}?v=${Date.now()}`;
+          });
+        }, 100);
+      }
+    }
   };
 
   return { settings, updateSettings };
