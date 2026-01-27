@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: 'Farid Fashion Store - Premium Streetwear & Fashion',
   description: 'Discover exclusive streetwear and fashion pieces from top brands. High-quality clothing, accessories, and unique designs.',
   keywords: 'streetwear, fashion, clothing, accessories, premium, exclusive',
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=5',
 }
 
 export default function RootLayout({
