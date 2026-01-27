@@ -102,11 +102,14 @@ export function useSiteSettings() {
   useEffect(() => {
     loadSettings();
 
+    let reloadTimeout: NodeJS.Timeout;
+
     // Listen for storage changes from admin panel
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'siteSettings') {
         console.log('🔄 Settings changed, reloading...');
-        loadSettings();
+        clearTimeout(reloadTimeout);
+        reloadTimeout = setTimeout(() => loadSettings(), 500);
       }
     };
 
@@ -115,12 +118,14 @@ export function useSiteSettings() {
     // Custom event for same-tab updates
     const handleSettingsUpdate = () => {
       console.log('🔄 Settings updated in same tab, reloading...');
-      loadSettings();
+      clearTimeout(reloadTimeout);
+      reloadTimeout = setTimeout(() => loadSettings(), 500);
     };
     
     window.addEventListener('settingsUpdated', handleSettingsUpdate);
 
     return () => {
+      clearTimeout(reloadTimeout);
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('settingsUpdated', handleSettingsUpdate);
     };
