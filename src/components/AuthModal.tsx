@@ -141,7 +141,7 @@ export default function AuthModal() {
             </div>
           )}
 
-          {(mode === 'login' || mode === 'register' || mode === 'forgot-password') && (
+          {(mode === 'login' || mode === 'register' || mode === 'forgot-password' || mode === 'reset-password') && (
             <div>
               <label className="block text-sm font-bold text-black mb-2">
                 Email Address
