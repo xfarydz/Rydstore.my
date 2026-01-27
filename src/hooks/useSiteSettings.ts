@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 
+const SETTINGS_ENDPOINT = '/api/settings';
+
 export interface SiteSettings {
   storeName: string;
   storeSlogan: string;
@@ -43,37 +45,58 @@ export function useSiteSettings() {
   const [settings, setSettings] = useState<SiteSettings>(defaultSettings);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const loadSettings = () => {
+  const persistLocal = (data: SiteSettings) => {
     if (typeof window !== 'undefined') {
-      const savedSettings = localStorage.getItem('siteSettings');
-      if (savedSettings) {
-        try {
-          const parsedSettings = JSON.parse(savedSettings);
-          const mergedSettings = parsedSettings.logoUrl
-            ? parsedSettings
-            : { ...defaultSettings, ...parsedSettings };
-
-          console.log('📋 Loaded settings from localStorage:', {
-            hasLogoUrl: !!mergedSettings.logoUrl,
-            logoUrlLength: mergedSettings.logoUrl?.length || 0,
-            storeName: mergedSettings.storeName
-          });
-
-          // Persist merge so future loads have logo
-          if (!parsedSettings.logoUrl) {
-            localStorage.setItem('siteSettings', JSON.stringify(mergedSettings));
-          }
-
-          setSettings(mergedSettings);
-        } catch (error) {
-          console.error('Error loading site settings:', error);
-          setSettings(defaultSettings);
-        }
-      } else {
-        console.log('ℹ️ No saved settings found, using defaults');
-      }
-      setIsLoaded(true);
+      localStorage.setItem('siteSettings', JSON.stringify(data));
     }
+  };
+
+  const loadFromLocal = (): SiteSettings | null => {
+    if (typeof window === 'undefined') return null;
+    const savedSettings = localStorage.getItem('siteSettings');
+    if (!savedSettings) return null;
+    try {
+      const parsed = JSON.parse(savedSettings);
+      return parsed.logoUrl ? parsed : { ...defaultSettings, ...parsed };
+    } catch (error) {
+      console.error('Error parsing local settings:', error);
+      return null;
+    }
+  };
+
+  const loadFromServer = async (): Promise<SiteSettings | null> => {
+    try {
+      const res = await fetch(SETTINGS_ENDPOINT, { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to fetch settings');
+      const data = await res.json();
+      return { ...defaultSettings, ...data };
+    } catch (error) {
+      console.warn('Settings API fetch failed, falling back to local:', error);
+      return null;
+    }
+  };
+
+  const loadSettings = async () => {
+    // 1) Try server
+    const remote = await loadFromServer();
+    if (remote) {
+      setSettings(remote);
+      persistLocal(remote);
+      setIsLoaded(true);
+      return;
+    }
+
+    // 2) Fallback to localStorage
+    const local = loadFromLocal();
+    if (local) {
+      setSettings(local);
+      setIsLoaded(true);
+      return;
+    }
+
+    // 3) Fallback to defaults
+    setSettings(defaultSettings);
+    setIsLoaded(true);
   };
 
   useEffect(() => {
@@ -103,30 +126,39 @@ export function useSiteSettings() {
     };
   }, []);
 
-  const updateSettings = (newSettings: Partial<SiteSettings>) => {
+  const updateSettings = async (newSettings: Partial<SiteSettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
     setSettings(updatedSettings);
-    localStorage.setItem('siteSettings', JSON.stringify(updatedSettings));
+    persistLocal(updatedSettings);
+    
+    // Push to server (best-effort)
+    try {
+      await fetch(SETTINGS_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedSettings),
+      });
+    } catch (error) {
+      console.warn('Settings API save failed, kept local only:', error);
+    }
     
     console.log('💾 Settings updated:', newSettings);
     
     // Dispatch custom event for same-tab updates
-    window.dispatchEvent(new CustomEvent('settingsUpdated'));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('settingsUpdated'));
+    }
     
     // Force refresh images if logo changed (for mobile cache busting)
     if (newSettings.logoUrl && newSettings.logoUrl !== settings.logoUrl) {
       console.log('🔄 Logo updated, clearing cache for mobile devices...');
       
-      // Clear mobile browser cache for images
       if (typeof window !== 'undefined') {
-        // Trigger storage event to update other tabs
         window.dispatchEvent(new StorageEvent('storage', {
           key: 'siteSettings',
           newValue: JSON.stringify(updatedSettings),
           url: window.location.href
         }));
-        
-        // Force reload images by updating timestamp
         setTimeout(() => {
           const images = document.querySelectorAll('img[src*="logo"], img[src*="data:image"]');
           images.forEach((img: any) => {
