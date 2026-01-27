@@ -1,0 +1,20 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/payment/notify/route": "app/api/payment/notify/route.js",
+  "/api/toyyibpay/create-bill/route": "app/api/toyyibpay/create-bill/route.js",
+  "/api/payment/callback/route": "app/api/payment/callback/route.js",
+  "/admin/page": "app/admin/page.js",
+  "/api/toyyibpay/webhook/route": "app/api/toyyibpay/webhook/route.js",
+  "/cart/page": "app/cart/page.js",
+  "/favorites/page": "app/favorites/page.js",
+  "/live-bidding/page": "app/live-bidding/page.js",
+  "/new-arrivals/page": "app/new-arrivals/page.js",
+  "/page": "app/page.js",
+  "/my-purchases/page": "app/my-purchases/page.js",
+  "/product/[id]/page": "app/product/[id]/page.js",
+  "/sold-items/page": "app/sold-items/page.js",
+  "/profile/page": "app/profile/page.js",
+  "/shop/page": "app/shop/page.js",
+  "/payment/success/page": "app/payment/success/page.js",
+  "/admin/dashboard/page": "app/admin/dashboard/page.js"
+}
