@@ -102,6 +102,11 @@ export function useSiteSettings() {
   useEffect(() => {
     loadSettings();
 
+    // Don't auto-reload in admin to prevent upload interruption
+    if (typeof window !== 'undefined' && window.location.pathname.includes('/admin')) {
+      return;
+    }
+
     let reloadTimeout: NodeJS.Timeout;
 
     // Listen for storage changes from admin panel
