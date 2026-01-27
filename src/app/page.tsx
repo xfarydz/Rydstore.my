@@ -10,7 +10,19 @@ import MaintenancePage from '@/components/MaintenancePage'
 import { useSiteSettings } from '@/hooks/useSiteSettings'
 
 function HomeContent() {
-  const { settings } = useSiteSettings();
+  const { settings, isLoaded } = useSiteSettings();
+
+  // Show loading state while settings are being loaded from localStorage
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Check if maintenance mode is enabled
   if (settings.maintenanceMode) {
