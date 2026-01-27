@@ -1,4 +1,6 @@
 {
   "buildCommand": "next build",
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "nodeVersion": "18.x"
 }
