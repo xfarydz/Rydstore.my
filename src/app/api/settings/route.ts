@@ -30,7 +30,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .select('*')
+    .select('settings')
     .eq('id', ROW_ID)
     .single()
 
@@ -39,7 +39,9 @@ export async function GET() {
     return NextResponse.json(DEFAULT_SETTINGS, { status: 200 })
   }
 
-  return NextResponse.json({ ...DEFAULT_SETTINGS, ...data }, { status: 200 })
+  // Merge default settings with stored JSON settings
+  const storedSettings = data?.settings || {}
+  return NextResponse.json({ ...DEFAULT_SETTINGS, ...storedSettings }, { status: 200 })
 }
 
 export async function POST(request: Request) {
@@ -48,7 +50,13 @@ export async function POST(request: Request) {
   }
 
   const payload = await request.json()
-  const upsertData = { id: ROW_ID, ...payload }
+  
+  // Store entire payload in JSON column
+  const upsertData = { 
+    id: ROW_ID, 
+    settings: payload,
+    updated_at: new Date().toISOString()
+  }
 
   const { error } = await supabase.from(TABLE_NAME).upsert(upsertData)
 
