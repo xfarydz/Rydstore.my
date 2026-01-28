@@ -7,6 +7,7 @@ import { useSiteSettings, SiteSettings } from '../../../hooks/useSiteSettings';
 import { useAllProducts } from '../../../hooks/useProducts';
 import CustomModal from '../../../components/CustomModal';
 import OrderTrackingModal from '../../../components/OrderTrackingModal';
+import { supabase } from '../../../utils/supabaseClient';
 
 interface Product {
   id: string;
@@ -119,6 +120,65 @@ export default function AdminDashboard() {
       
       img.src = URL.createObjectURL(file);
     });
+  };
+
+  const compressImageToBlob = (file: File, maxWidth = 1200, quality = 0.7): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to create blob'));
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  const uploadHeroBackground = async (file: File): Promise<string> => {
+    if (!supabase) {
+      throw new Error('Supabase client not configured');
+    }
+
+    const blob = await compressImageToBlob(file, 1200, 0.7);
+    const filePath = 'hero/hero-background.jpg';
+
+    const { error } = await supabase.storage
+      .from('site-assets')
+      .upload(filePath, blob, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: 'image/jpeg',
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const { data } = supabase.storage.from('site-assets').getPublicUrl(filePath);
+    return `${data.publicUrl}?v=${Date.now()}`;
   };
 
   // Helper functions for managing multiple images
@@ -2736,12 +2796,18 @@ export default function AdminDashboard() {
                         e.preventDefault();
                         const file = e.dataTransfer.files[0];
                         if (file && file.type.startsWith('image/')) {
-                          compressImage(file, 1200, 0.6)
-                            .then((compressed) => {
-                              updateSettings({ heroBackgroundImage: compressed });
+                          uploadHeroBackground(file)
+                            .then((publicUrl) => {
+                              updateSettings({ heroBackgroundImage: publicUrl });
                             })
-                            .catch((error) => {
-                              console.error('Failed to compress hero background image:', error);
+                            .catch(async (error) => {
+                              console.error('Hero upload failed, falling back to local:', error);
+                              try {
+                                const compressed = await compressImage(file, 800, 0.6);
+                                updateSettings({ heroBackgroundImage: compressed });
+                              } catch (fallbackError) {
+                                console.error('Fallback compression failed:', fallbackError);
+                              }
                             });
                         }
                       }}
@@ -2774,12 +2840,18 @@ export default function AdminDashboard() {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          compressImage(file, 1200, 0.6)
-                            .then((compressed) => {
-                              updateSettings({ heroBackgroundImage: compressed });
+                          uploadHeroBackground(file)
+                            .then((publicUrl) => {
+                              updateSettings({ heroBackgroundImage: publicUrl });
                             })
-                            .catch((error) => {
-                              console.error('Failed to compress hero background image:', error);
+                            .catch(async (error) => {
+                              console.error('Hero upload failed, falling back to local:', error);
+                              try {
+                                const compressed = await compressImage(file, 800, 0.6);
+                                updateSettings({ heroBackgroundImage: compressed });
+                              } catch (fallbackError) {
+                                console.error('Fallback compression failed:', fallbackError);
+                              }
                             });
                         }
                       }}
