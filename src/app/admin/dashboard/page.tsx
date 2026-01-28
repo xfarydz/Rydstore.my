@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Package, Users, ShoppingCart, Settings, LogOut, Edit, Trash2, Upload, Globe, Check, Truck, X, Clock } from 'lucide-react';
 import { useSiteSettings, SiteSettings } from '../../../hooks/useSiteSettings';
-import { useAllProducts } from '../../../hooks/useProducts';
+import { useAllProducts, saveProducts as syncProducts } from '../../../hooks/useProducts';
 import CustomModal from '../../../components/CustomModal';
 import OrderTrackingModal from '../../../components/OrderTrackingModal';
 import { supabase } from '../../../utils/supabaseClient';
@@ -555,45 +555,16 @@ export default function AdminDashboard() {
     window.location.href = '/admin';
   };
 
-  const saveProducts = (newProducts: Product[]) => {
+  const saveProducts = async (newProducts: Product[]) => {
     setProducts(newProducts);
     
     try {
-      // Check localStorage size before saving
-      const dataString = JSON.stringify(newProducts);
-      const dataSize = new Blob([dataString]).size;
-      console.log('Data size:', (dataSize / 1024 / 1024).toFixed(2), 'MB');
-      
-      localStorage.setItem('adminProducts', dataString);
-      
-      // Trigger product update event for other components
-      window.dispatchEvent(new Event('productUpdated'));
-      window.dispatchEvent(new Event('storage'));
-      
-      console.log('Products saved to localStorage:', newProducts.length, 'total products');
+      // Save to both localStorage and Supabase using utility function
+      await syncProducts(newProducts);
+      console.log('Products saved successfully:', newProducts.length, 'total products');
     } catch (error) {
-      if (error instanceof DOMException && error.code === 22) {
-        // QuotaExceededError
-        alert('Storage quota exceeded! Please use smaller images or contact support. Try using images under 500KB.');
-        console.error('LocalStorage quota exceeded. Current data size too large.');
-        
-        // Optional: Clear some space by keeping only essential data
-        const essentialProducts = newProducts.map(p => ({
-          ...p,
-          image: p.image.length > 50000 ? '' : p.image, // Remove large images
-          images: [] // Remove additional images to save space
-        }));
-        
-        try {
-          localStorage.setItem('adminProducts', JSON.stringify(essentialProducts));
-          alert('Saved with compressed data. Please re-upload smaller images.');
-        } catch (secondError) {
-          alert('Critical storage error. Please clear browser data and try again.');
-        }
-      } else {
-        console.error('Error saving products:', error);
-        alert('Error saving product. Please try again.');
-      }
+      console.error('Error saving products:', error);
+      alert('Error saving product. Please try again.');
     }
   };
 

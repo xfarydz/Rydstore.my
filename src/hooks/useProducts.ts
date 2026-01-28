@@ -7,29 +7,62 @@ export function useProducts() {
   const [allProducts, setAllProducts] = useState(defaultProducts);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const loadProducts = () => {
-    if (typeof window !== 'undefined') {
-      let adminProducts = localStorage.getItem('adminProducts');
-      
-      // If no adminProducts in localStorage, initialize with default products
-      if (!adminProducts) {
-        console.log('No adminProducts found, initializing with default products');
-        localStorage.setItem('adminProducts', JSON.stringify(defaultProducts));
-        adminProducts = JSON.stringify(defaultProducts);
+  const loadFromServer = async () => {
+    try {
+      const res = await fetch('/api/products', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        console.log('Loaded products from server:', data.length, 'products');
+        return data;
       }
-      
-      try {
-        const parsedProducts = JSON.parse(adminProducts);
-        console.log('Loading products from localStorage:', parsedProducts.length, 'products');
-        setAllProducts(parsedProducts);
-        
-        // Clean up expired reservations on load
-        cleanupExpiredReservations();
-      } catch (error) {
-        console.error('Error loading admin products:', error);
-        setAllProducts(defaultProducts);
+    } catch (error) {
+      console.error('Error loading products from server:', error);
+    }
+    return null;
+  };
+
+  const loadFromLocal = () => {
+    if (typeof window !== 'undefined') {
+      const adminProducts = localStorage.getItem('adminProducts');
+      if (adminProducts) {
+        try {
+          return JSON.parse(adminProducts);
+        } catch (error) {
+          console.error('Error parsing localStorage products:', error);
+        }
       }
     }
+    return null;
+  };
+
+  const loadProducts = async () => {
+    // Try server first, then localStorage, then defaults
+    let products = await loadFromServer();
+    
+    if (!products || products.length === 0) {
+      console.log('No server products, trying localStorage');
+      products = loadFromLocal();
+    }
+    
+    if (!products || products.length === 0) {
+      console.log('No localStorage products, using defaults');
+      products = defaultProducts;
+      // Save defaults to localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('adminProducts', JSON.stringify(defaultProducts));
+      }
+    }
+    
+    console.log('Loading products:', products.length, 'products');
+    setAllProducts(products);
+    
+    // Save to localStorage for offline access
+    if (typeof window !== 'undefined' && products) {
+      localStorage.setItem('adminProducts', JSON.stringify(products));
+    }
+    
+    // Clean up expired reservations on load
+    cleanupExpiredReservations();
   };
 
   useEffect(() => {
@@ -112,25 +145,58 @@ export function cleanupExpiredReservations() {
 export function useAllProducts() {
   const [products, setProducts] = useState(defaultProducts);
 
-  const loadAllProducts = () => {
+  const loadFromServer = async () => {
+    try {
+      const res = await fetch('/api/products', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        console.log('Loaded all products from server:', data.length, 'products');
+        return data;
+      }
+    } catch (error) {
+      console.error('Error loading products from server:', error);
+    }
+    return null;
+  };
+
+  const loadFromLocal = () => {
     if (typeof window !== 'undefined') {
-      let adminProducts = localStorage.getItem('adminProducts');
-      
-      // If no adminProducts in localStorage, initialize with default products
-      if (!adminProducts) {
-        console.log('No adminProducts found in useAllProducts, initializing with default products');
+      const adminProducts = localStorage.getItem('adminProducts');
+      if (adminProducts) {
+        try {
+          return JSON.parse(adminProducts);
+        } catch (error) {
+          console.error('Error parsing localStorage products:', error);
+        }
+      }
+    }
+    return null;
+  };
+
+  const loadAllProducts = async () => {
+    // Try server first, then localStorage, then defaults
+    let allProducts = await loadFromServer();
+    
+    if (!allProducts || allProducts.length === 0) {
+      console.log('No server products in useAllProducts, trying localStorage');
+      allProducts = loadFromLocal();
+    }
+    
+    if (!allProducts || allProducts.length === 0) {
+      console.log('No localStorage products, using defaults');
+      allProducts = defaultProducts;
+      // Save defaults to localStorage
+      if (typeof window !== 'undefined') {
         localStorage.setItem('adminProducts', JSON.stringify(defaultProducts));
-        adminProducts = JSON.stringify(defaultProducts);
       }
-      
-      try {
-        const parsedProducts = JSON.parse(adminProducts);
-        console.log('Loading all products from localStorage:', parsedProducts.length, 'products');
-        setProducts(parsedProducts);
-      } catch (error) {
-        console.error('Error loading admin products:', error);
-        setProducts(defaultProducts);
-      }
+    }
+    
+    console.log('Loading all products:', allProducts.length, 'products');
+    setProducts(allProducts);
+    
+    // Save to localStorage for offline access
+    if (typeof window !== 'undefined' && allProducts) {
+      localStorage.setItem('adminProducts', JSON.stringify(allProducts));
     }
   };
 
@@ -153,4 +219,30 @@ export function useAllProducts() {
   }, []);
 
   return products;
+}
+
+// Utility function to save products to both localStorage and Supabase
+export async function saveProducts(products: any[]) {
+  // Save to localStorage immediately
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('adminProducts', JSON.stringify(products));
+    window.dispatchEvent(new Event('productUpdated'));
+  }
+  
+  // Save to Supabase in background
+  try {
+    const res = await fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(products)
+    });
+    
+    if (!res.ok) {
+      console.error('Failed to sync products to server:', res.status);
+    } else {
+      console.log('Products synced to server successfully');
+    }
+  } catch (error) {
+    console.error('Error syncing products to server:', error);
+  }
 }
