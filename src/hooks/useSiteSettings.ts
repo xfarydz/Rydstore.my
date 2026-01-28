@@ -143,11 +143,15 @@ export function useSiteSettings() {
     
     // Push to server (best-effort)
     try {
-      await fetch(SETTINGS_ENDPOINT, {
+      const res = await fetch(SETTINGS_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedSettings),
       });
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.warn('Settings API save failed:', res.status, errorText);
+      }
     } catch (error) {
       console.warn('Settings API save failed, kept local only:', error);
     }

@@ -2736,11 +2736,13 @@ export default function AdminDashboard() {
                         e.preventDefault();
                         const file = e.dataTransfer.files[0];
                         if (file && file.type.startsWith('image/')) {
-                          const reader = new FileReader();
-                          reader.onload = (e) => {
-                            updateSettings({ heroBackgroundImage: e.target?.result as string });
-                          };
-                          reader.readAsDataURL(file);
+                          compressImage(file, 1200, 0.6)
+                            .then((compressed) => {
+                              updateSettings({ heroBackgroundImage: compressed });
+                            })
+                            .catch((error) => {
+                              console.error('Failed to compress hero background image:', error);
+                            });
                         }
                       }}
                       onDragOver={(e) => e.preventDefault()}
@@ -2772,11 +2774,13 @@ export default function AdminDashboard() {
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (e) => {
-                            updateSettings({ heroBackgroundImage: e.target?.result as string });
-                          };
-                          reader.readAsDataURL(file);
+                          compressImage(file, 1200, 0.6)
+                            .then((compressed) => {
+                              updateSettings({ heroBackgroundImage: compressed });
+                            })
+                            .catch((error) => {
+                              console.error('Failed to compress hero background image:', error);
+                            });
                         }
                       }}
                     />
